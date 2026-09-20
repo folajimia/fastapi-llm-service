@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from app.api.router import api_router
 
 app = FastAPI(
-    title="LLM Service",
+    title="LLM Services",
     version="0.1.0",
 )
 

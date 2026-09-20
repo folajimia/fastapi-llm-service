@@ -39,10 +39,10 @@ Open `http://127.0.0.1:8000/docs`.
 
 ## Exercise
 
-- [ ] Start the server.
-- [ ] Open Swagger UI at `/docs`.
-- [ ] Confirm the title and version are visible.
-- [ ] Stop the server with `Ctrl+C`.
+- [x] Start the server.
+- [x] Open Swagger UI at `/docs`.
+- [x] Confirm the title and version are visible.
+- [x] Stop the server with `Ctrl+C`.
 
 ## Common mistakes
 
@@ -53,6 +53,28 @@ Open `http://127.0.0.1:8000/docs`.
 ## Mentor questions
 
 1. What should belong in `main.py`, and what should not?
+The file i created has the router import and inclusion commented out. That means my routes are not registered, so `/api/v1/health` will return `404`.
+
+Things that belong in `main.py`:
+
+- Create the `FastAPI` application
+- Set application metadata such as title and version
+- Include API routers
+- Configure middleware
+- Register global exception handlers
+- Configure startup/shutdown or lifespan behavior
+- Optionally expose health/readiness infrastructure
+
+Things that generally should not belong there:
+
+- Endpoint implementation logic
+- LLM client code
+- Database queries
+- Request/response schemas
+- Business rules
+- Large configuration definitions
+- Test code
+- Secrets or API keys
 
 ## Progress
 

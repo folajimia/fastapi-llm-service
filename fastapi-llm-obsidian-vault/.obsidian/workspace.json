@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Lessons/01 Project Setup with Poetry.md",
+                "file": "Lessons/05 Configuration and Dependency Injection.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "01 Project Setup with Poetry"
+              "title": "05 Configuration and Dependency Injection"
             }
           }
         ]
@@ -83,7 +83,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 409.94140625
   },
   "right": {
     "id": "8ce6ae00481e73ba",
@@ -99,7 +99,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Lessons/01 Project Setup with Poetry.md",
+                "file": "Lessons/05 Configuration and Dependency Injection.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -118,7 +118,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "Lessons/01 Project Setup with Poetry.md",
+                "file": "Lessons/05 Configuration and Dependency Injection.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
@@ -161,7 +161,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Lessons/01 Project Setup with Poetry.md",
+                "file": "Lessons/05 Configuration and Dependency Injection.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
@@ -189,5 +189,10 @@
     }
   },
   "active": "9ee01c2513de6ba4",
-  "lastOpenFiles": []
+  "lastOpenFiles": [
+    "Lessons/04 Testing the Health Endpoint.md",
+    "Lessons/03 Routing and API Versioning.md",
+    "Lessons/02 FastAPI Application.md",
+    "Lessons/01 Project Setup with Poetry.md"
+  ]
 }

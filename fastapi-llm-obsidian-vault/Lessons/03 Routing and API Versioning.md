@@ -58,9 +58,9 @@ Client → main.py → api/router.py → health.py → HTTP response
 
 ## Exercise
 
-- [ ] Confirm `GET /api/v1/health` appears in `/docs`.
-- [ ] Call it with `curl`.
-- [ ] Add a temporary `/ping` route and remove it after testing.
+- [x] Confirm `GET /api/v1/health` appears in `/docs`.
+- [x] Call it with `curl`.
+- [x] Add a temporary `/ping` route and remove it after testing.
 
 ```bash
 curl http://127.0.0.1:8000/api/v1/health

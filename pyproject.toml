@@ -28,3 +28,21 @@ dev = [
     "httpx (>=0.28.1,<0.29.0)",
     "ruff (>=0.16.6,<0.17.0)"
 ]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 88
+exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
