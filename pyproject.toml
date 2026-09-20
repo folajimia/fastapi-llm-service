@@ -1,0 +1,30 @@
+[project]
+name = "fastapi-llm-service"
+version = "0.1.0"
+description = "A FastAPI service for LLM application workflows"
+authors = [
+    {name = "Folajimi Adekoya",email = "fadekoya@zendesk.com"}
+]
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "fastapi (<0.116)",
+    "uvicorn (<0.31)",
+    "gunicorn (<26)"
+]
+
+
+[tool.poetry]
+package-mode = false
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[dependency-groups]
+dev = [
+    "pytest (<8.4)",
+    "httpx (>=0.28.1,<0.29.0)",
+    "ruff (>=0.16.6,<0.17.0)"
+]
