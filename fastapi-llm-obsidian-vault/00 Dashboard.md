@@ -12,22 +12,23 @@
 
 ## Current status
 
-- Course status: **Started — foundations created, verification still needed**
-- Current next action: Complete [[Lessons/04 Testing the Health Endpoint|Lesson 04 — Testing]]
-- Existing work carried forward: virtual environment, FastAPI app, `/api/v1/health`, `APIRouter` structure.
+- Course status: **In progress — Lessons 01–05 done, Lesson 06 ~80% built**
+- Current next action: Complete [[Lessons/06B Wiring the Route to the Service|Lesson 06B — Wiring the Route to the Service]] (the missing sub-lesson that fixes the half-finished chat route)
+- Open bugs to fix as part of 06B: the chat route ignores the service (echo + dead code), and the prompt has a `\\n` double-escape in both the service and its test.
 - Project constraint: use **Poetry**, commit `poetry.lock`, separate production/development dependencies, and build Docker with Poetry.
 
 ## Progress
 
 - [x] Understand the service goal and 10-week roadmap
-- [ ] Migrate the project setup to Poetry and commit `poetry.lock`
+- [x] Migrate the project setup to Poetry and commit `poetry.lock`
 - [x] Create a minimal FastAPI application
-- [x] Create `/api/v1/health` conceptually
+- [x] Create `/api/v1/health`
 - [x] Separate routes with `APIRouter`
-- [ ] Run and verify the health test locally
-- [ ] Add Ruff and type-checking to the project workflow
-- [ ] Add typed configuration and dependency injection
-- [ ] Add service and LLM-client boundaries
+- [x] Run and verify the health test locally (3 tests pass)
+- [x] Add Ruff configuration (run `ruff check . --fix` + `ruff format .` until clean)
+- [ ] Add type-checking (mypy) to the project workflow
+- [x] Add typed configuration and dependency injection (one test override remains, done in 06B)
+- [ ] Add service and LLM-client boundaries (in progress — 06B is the missing piece)
 - [ ] Add PostgreSQL, SQLAlchemy, and Alembic
 - [ ] Add deterministic LLM workflow tests
 - [ ] Add errors, timeouts, retries, and structured outputs
@@ -39,12 +40,12 @@
 
 | Lesson | Topic | Status |
 |---|---|---|
-| [[Lessons/01 Project Setup with Poetry|01]] | Project setup and reproducibility | Started |
-| [[Lessons/02 FastAPI Application|02]] | Minimal FastAPI application | Complete conceptually |
-| [[Lessons/03 Routing and API Versioning|03]] | Routers and `/api/v1` | Complete conceptually |
-| [[Lessons/04 Testing the Health Endpoint|04]] | API testing | Next |
-| [[Lessons/05 Configuration and Dependency Injection|05]] | Settings and dependencies | Not started |
-| [[Lessons/06 Service Boundaries and LLM Client|06]] | Application architecture | Not started |
+| [[Lessons/01 Project Setup with Poetry|01]] | Project setup and reproducibility | Complete |
+| [[Lessons/02 FastAPI Application|02]] | Minimal FastAPI application | Complete |
+| [[Lessons/03 Routing and API Versioning|03]] | Routers and `/api/v1` | Complete |
+| [[Lessons/04 Testing the Health Endpoint|04]] | API testing | Complete |
+| [[Lessons/05 Configuration and Dependency Injection|05]] | Settings and dependencies | Mostly complete |
+| [[Lessons/06 Service Boundaries and LLM Client|06]] | Application architecture | In progress — 06B next |
 | [[Lessons/07 Persistence and Migrations|07]] | PostgreSQL, SQLAlchemy, Alembic | Not started |
 | [[Lessons/08 Reliable LLM Workflows|08]] | Errors, timeouts, retries, structured output | Not started |
 | [[Lessons/09 Observability and Lifespan|09]] | Logs, IDs, health, readiness, resources | Not started |

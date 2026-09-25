@@ -20,9 +20,9 @@ Secrets must not live in source code. Dependency injection makes a route’s req
 
 ```text
 app/
-├── core/config.py
-├── dependencies.py
-└── api/routes/
+├── core/config.py          # Settings (typed configuration)
+├── api/dependencies.py     # dependency providers like get_chat_service
+└── api/routes/             # routes that receive dependencies via Depends
 ```
 
 ## Example
@@ -34,6 +34,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_name: str = "LLM Service"
     environment: str = "development"
+    llm_api_key: str
+    llm_model: str = "some-model"
+    llm_timeout_seconds: float = 30.0
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 ```
 
@@ -41,10 +44,10 @@ Do not commit `.env`. Commit a safe `.env.example` containing names but no secre
 
 ## Exercise
 
-- [ ] Add typed settings.
-- [ ] Add `.env` to `.gitignore`.
-- [ ] Add `.env.example`.
-- [ ] Inject a settings object into one route or service.
+- [x] Add typed settings.
+- [x] Add `.env` to `.gitignore`.
+- [x] Add `.env.example`.
+- [x] Inject a settings object into one route or service.
 - [ ] Override the dependency in a test.
 
 ## Mentor questions
@@ -54,7 +57,6 @@ Do not commit `.env`. Commit a safe `.env.example` containing names but no secre
 
 ## Progress
 
-- Status: **Not started**
-- Completed: [ ]
+- Status: **Mostly complete — only "Override the dependency in a test" remains, and [[Lessons/06B Wiring the Route to the Service|Lesson 06B]] Step 5 finishes it.**
+- Completed: [x] typed settings [x] `.env` gitignored [x] `.env.example` [x] settings + service injected into routes [ ] dependency override in a test
 - Date:
-
