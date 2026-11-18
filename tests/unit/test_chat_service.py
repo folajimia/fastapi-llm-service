@@ -17,12 +17,12 @@ def test_chat_service_returns_llm_response() -> None:
     fake_client = FakeLLMClient(response="Hello from the fake model")
     service = ChatService(llm_client=fake_client)
 
-    result = asyncio.run(service.reply("Hello"))
+    reply, conversation_id = asyncio.run(service.reply("Hello"))
 
-    assert result == "Hello from the fake model"
-    assert fake_client.prompts == [
-        "You are a helpful assistant.\nUser: Hello"
-    ]
+    assert reply == "Hello from the fake model"
+    assert conversation_id is not None  # ephemeral id — no repository configured
+    assert fake_client.prompts == ["You are a helpful assistant.\nUser: Hello"]
+
 
 def test_chat_service_propagates_provider_failure() -> None:
     class FailingClient:

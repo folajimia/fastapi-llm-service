@@ -107,7 +107,10 @@ This test should not assert HTTP status codes. HTTP status codes belong in an AP
 
 - Status: **In progress — test exists and passes, but currently asserts the `\\n` bug. Fix the assertion along with the service prompt (see [[Lessons/06B Wiring the Route to the Service|06B]] Step 3), then add the failure test below.**
 - Completed: [x] Fake client returns a deterministic answer. [x] No real network call. [x] Test checks the response. [ ] Test checks the prompt with a real newline. [ ] Failure case added.
-- Test output: 3 passed (current suite)
+- Test output: 4 passed (current suite)
 - Date:
 - Commit:
 
+## Review note
+
+The current test includes the real-newline prompt assertion and the provider-failure test described above.

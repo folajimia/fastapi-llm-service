@@ -8,10 +8,10 @@ This lesson is split into four parts, done in order:
 
 | Part | Topic | Status |
 |---|---|---|
-| [[Lessons/06A ChatService Without FastAPI\|06A]] | Create `ChatService` with no FastAPI imports | In progress (escape bug to fix) |
-| [[Lessons/06B Wiring the Route to the Service\|06B]] | Wire the route to the service with `Depends` | **Next — this is the current step** |
-| [[Lessons/06C Provider Isolation\|06C]] | Keep provider SDK details out of routes | Started conceptually |
-| [[Lessons/06D Testing the ChatService\|06D]] | Test the service with a fake LLM client | In progress (assertion to fix) |
+| [[Lessons/06A ChatService Without FastAPI\|06A]] | Create `ChatService` with no FastAPI imports | Complete |
+| [[Lessons/06B Wiring the Route to the Service\|06B]] | Wire the route to the service with `Depends` | Complete |
+| [[Lessons/06C Provider Isolation\|06C]] | Keep provider SDK details out of routes | Complete conceptually; adapter tests remain |
+| [[Lessons/06D Testing the ChatService\|06D]] | Test the service with a fake LLM client | Complete for the basic workflow |
 
 ## Target architecture
 
@@ -44,19 +44,15 @@ The service depends on the interface, not on a specific provider SDK. This is us
 
 Already built: `ChatService` ([[Lessons/06A ChatService Without FastAPI|06A]]), the `LLMClient` protocol, `DemoLLMClient` in `app/api/dependencies.py`, and a passing unit test ([[Lessons/06D Testing the ChatService|06D]]).
 
-Not yet done, in order:
-
-1. **[[Lessons/06B Wiring the Route to the Service|06B]]** — the chat route still echoes the message and ignores the service (with dead code after the first `return`). Fix this first.
-2. Fix the `\\n` double-escape in the service prompt and the matching test assertion (06B Step 3).
-3. Complete the 06C and 06D checkpoints.
+The basic route → service → fake-client chain is now complete. The next architecture exercise is in Lesson 07: inject the repository into the same service without moving database code into the route.
 
 ## Exercise
 
-- [ ] Create a `ChatService` with no FastAPI imports (06A — done, pending prompt fix).
-- [ ] Wire the route to the service with `Depends` (06B).
-- [ ] Add a dependency-override test proving the route accepts any injected service (06B Step 5).
-- [ ] Keep provider SDK details out of route files (06C).
-- [ ] Test a service response and a provider failure without a real network call (06D).
+- [x] Create a `ChatService` with no FastAPI imports (06A).
+- [x] Wire the route to the service with `Depends` (06B).
+- [x] Add a dependency-override test proving the route accepts an injected fake (06B Step 5).
+- [x] Keep provider SDK details out of route files (06C).
+- [x] Test a service response and a provider failure without a real network call (06D).
 
 ## Mentor questions
 
@@ -65,7 +61,7 @@ Not yet done, in order:
 
 ## Progress
 
-- Status: **In progress — roughly 80% built; 06B is the missing piece**
-- Completed: [x] Service without FastAPI [x] LLM client protocol [x] Fake client in unit tests [ ] Route wired to service [ ] Prompt escape bug fixed
+- Status: **Complete for the basic service boundary; persistence and production reliability continue in Lessons 07–09**
+- Completed: [x] Service without FastAPI [x] LLM client protocol [x] Fake client in unit tests [x] Route wired to service [x] Prompt uses a real newline
 - Date:
 - Commit:

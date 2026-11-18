@@ -104,17 +104,7 @@ See [[Lessons/06A ChatService Without FastAPI|06A]] → Common mistakes for the 
 
 ```python
 # tests/test_chat.py
-def test_chat_route_returns_service_reply(client):
-    response = client.post(
-        "/api/v1/chat",
-        json={"message": "Hello"},
-    )
-
-    assert response.status_code == 200
-    assert response.json() == {
-        "reply": "Demo response for: You are a helpful assistant.\nUser: Hello",
-    }
-```
+test_chat
 
 This test now proves the full chain: route → dependency provider → service → demo client → response.
 
@@ -195,7 +185,11 @@ If you still see `"You said: Hello"`, the route fix is not actually saved or the
 
 ## Progress
 
-- Status: **Not started**
-- Completed: [ ]
+- Status: **Complete**
+- Completed: [x] route delegates to service [x] prompt newline fixed [x] dependency override test
 - Date:
 - Commit:
+
+## Review note
+
+The route is now wired to `ChatService`, has no echo/dead-code path, and is covered by the dependency-override API test. The “currently broken” section above is preserved as a before-and-after teaching example.

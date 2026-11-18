@@ -63,7 +63,41 @@ Add to `Settings` in `app/core/config.py` (and copy the names into `.env.example
 database_url: str = "postgresql+asyncpg://llm:dev@localhost:5432/llm"
 ```
 
-Note the `+asyncpg` part: it tells SQLAlchemy to use the async driver. Forgetting it is the classic "greenlet_spawn has not been called" error.
+Note the `+asyncpg` part: it tells SQLAlchemy to use the **async** driver — the one FastAPI needs. Forgetting it makes SQLAlchemy look for the sync driver (`psycopg2`), which isn't installed: `Can't load plugin: sqlalchemy.dialects:postgresql.psycopg2`. Choosing the async driver has a consequence for Alembic — see Step 5, item 3.
+
+### Known quirk on this machine — `poetry add` fails with a network error
+
+On this work machine, `poetry add` may fail with:
+
+```text
+All attempts to connect to pypi.org failed.
+Probable Causes: the server is not responding / DNS / no internet
+```
+
+**None of those three causes is true.** The real story (diagnosed 2026-10-01):
+
+1. Zendesk's Netskope proxy intercepts **all** HTTPS traffic and re-signs every certificate with the corporate CA (`ca.zendesk.goskope.com`). This affects every host, not just pypi.org — public PyPI mirrors get the same certificate, so switching sources does not help.
+2. That corporate CA certificate is missing the `keyUsage` extension. Old SSL libraries (this venv's LibreSSL) tolerate it; modern OpenSSL 3.5+ — which Homebrew's Poetry runs on — rejects it: `certificate verify failed: CA cert does not include key usage extension`.
+3. Poetry 2.4 cannot be configured around it: certificate settings (`certificates.<repo>.cert`, `verify = false`, `REQUESTS_CA_BUNDLE`) are only read for repositories you explicitly declare. The **default** PyPI source ignores all of them and always verifies strictly.
+
+**How this was diagnosed** (worth remembering as a method):
+
+```bash
+curl -sv https://pypi.org/simple/ -o /dev/null 2>&1 | grep -i issuer   # shows the corporate CA, not the real one
+poetry add sqlalchemy alembic asyncpg -v                              # the real error, hidden by the friendly message
+```
+
+The lesson: **"network error" messages lie.** When the obvious causes don't apply, get the raw error with `-v` before believing the summary.
+
+**Workarounds, in order:**
+
+1. **Run the one command off the corporate network** (hotspot / home wifi). The real pypi.org certificate verifies fine, `pyproject.toml` + `poetry.lock` get updated correctly, and everything after (`poetry install`, tests, running the app) works offline. Poetry only needs the network while *resolving*.
+2. **File with IT** — the malformed CA breaks every OpenSSL 3.5+ tool (Homebrew Python, Poetry, Node…), not just this. Ask about an internal PyPI mirror (often in Artifactory) or a fixed CA. Give them the exact string: `CA cert does not include key usage extension`.
+3. **Stopgap only** (breaks the lock discipline of this project):
+   ```bash
+   REQUESTS_CA_BUNDLE=~/.certs/corporate-cas.pem poetry run pip install sqlalchemy alembic asyncpg
+   ```
+   The venv's old LibreSSL accepts the corporate CA (`~/.certs/corporate-cas.pem` was exported 2026-10-01 for this). But pip does **not** update `poetry.lock` — regenerate it on a clean network later.
 
 ## Step 3 — Create the database module
 
@@ -143,13 +177,63 @@ from app.db import models  # noqa: F401 — imports register the models
 target_metadata = Base.metadata
 ```
 
-2. Replace the hardcoded `sqlalchemy.url` with your settings (look for the `run_migrations_online` function):
+2. Override the hardcoded `sqlalchemy.url` with your settings. First, understand what you're changing: `alembic init` created `alembic.ini` with a placeholder line `sqlalchemy.url = driver://user:pass@localhost/dbname`. Don't edit that line — `alembic.ini` is committed to git (a password would live in your repo forever), and a URL there would become a second source of truth alongside `Settings`. Instead, override it **in memory** a t the top of `migrations/env.py`, right after `config = context.config` (NOT inside `run_migrations_online` — placing it at the top means both the offline and online code paths pick it up):
 
 ```python
+# migrations/env.py — with your other app imports near the top:
 from app.core.config import settings
 
+# ... then, immediately after this existing line:
+config = context.config
+# add this one:
 config.set_main_option("sqlalchemy.url", settings.database_url)
 ```
+
+`set_main_option` means: "whatever `alembic.ini` says for `sqlalchemy.url`, use this instead." The chain becomes `.env` → `Settings` → `env.py` → Alembic → PostgreSQL — the same one source of truth the app uses.
+
+3. Make `run_migrations_online` async. The default `env.py` template is written for **sync** drivers. Our URL is async (`asyncpg`), so the default template fails with:
+
+   ```text
+   sqlalchemy.exc.MissingGreenlet: greenlet_spawn has not been called; can't call
+   await_only() here. Was IO attempted in an unexpected place?
+   ```
+
+   Meaning: sync code tried to touch the async driver's world. The fix is the async version of `run_migrations_online` (this is what `alembic init -t async` generates — written out here so you can see what changes). At the top of `env.py`, alongside the other imports:
+
+   ```python
+   import asyncio
+
+   from sqlalchemy import pool
+   from sqlalchemy.ext.asyncio import async_engine_from_config
+   ```
+
+   Then replace the whole `run_migrations_online` function:
+
+   ```python
+   def run_migrations_online() -> None:
+       """Run migrations in 'online' mode with the async driver."""
+       connectable = async_engine_from_config(
+           config.get_section(config.config_ini_section, {}),
+           prefix="sqlalchemy.",
+           poolclass=pool.NullPool,
+       )
+
+       def do_run_migrations(connection) -> None:
+           context.configure(
+               connection=connection, target_metadata=target_metadata
+           )
+
+           with context.begin_transaction():
+               context.run_migrations()
+
+       async def run_async_migrations() -> None:
+           async with connectable.connect() as connection:
+               await connection.run_sync(do_run_migrations)
+
+       asyncio.run(run_async_migrations())
+   ```
+
+   What changed: `engine_from_config` (sync) → `async_engine_from_config` (async), and the connection work is wrapped in `asyncio.run(...)` — a tiny event loop for the migration run — with `connection.run_sync(...)` as the official hop between the async connection and Alembic's sync migration code.
 
 Generate and apply the first migration:
 
@@ -203,20 +287,60 @@ Notice: the repository takes the session in its constructor, exactly like `ChatS
 
 ## Step 7 — Wire it up
 
-The service gains an optional repository (constructor injection again):
+The service gains an **optional** repository (constructor injection again). Full file, with four details the simple sketch hides:
 
 ```python
-# app/services/chat.py — sketch of the new reply flow
-async def reply(self, user_message: str, conversation_id: uuid.UUID | None) -> str:
-    if conversation_id is None and self._repository is not None:
-        conversation = await self._repository.create_conversation()
-        conversation_id = conversation.id
-    await self._repository.add_message(conversation_id, "user", user_message)
-    prompt = self._build_prompt(user_message)
-    reply = await self._llm_client.generate(prompt)
-    await self._repository.add_message(conversation_id, "assistant", reply)
-    return reply
+# app/services/chat.py
+from __future__ import annotations   # makes X | None syntax legal on Python 3.9
+
+import uuid
+
+from app.llm.client import LLMClient
+from app.repositories.chat import ChatRepository
+
+
+class ChatService:
+    def __init__(
+        self,
+        llm_client: LLMClient,
+        repository: ChatRepository | None = None,
+    ) -> None:
+        self._llm_client = llm_client
+        self._repository = repository
+
+    async def reply(
+        self, user_message: str, conversation_id: uuid.UUID | None = None
+    ) -> str:
+        if self._repository is not None:
+            if conversation_id is None:
+                conversation = await self._repository.create_conversation()
+                conversation_id = conversation.id
+            await self._repository.add_message(
+                conversation_id, "user", user_message
+            )
+
+        prompt = self._build_prompt(user_message)
+        reply = await self._llm_client.generate(prompt)
+
+        if self._repository is not None:
+            await self._repository.add_message(conversation_id, "assistant", reply)
+        return reply
+
+    @staticmethod
+    def _build_prompt(user_message: str) -> str:
+        return f"You are a helpful assistant.\nUser: {user_message}"
 ```
+
+The four details, and why each matters:
+
+1. **`from __future__ import annotations`** must be the first line — without it, `uuid.UUID | None` crashes on import with `TypeError: unsupported operand type(s) for |` on Python 3.9 (this project supports `>=3.9`).
+2. **`import uuid`** — the annotation uses it; forgetting the import gives `NameError` at import time.
+3. **Defaults of `None` on both new parameters** — backward compatibility in your own code: the route still calls `service.reply(request.message)`, the old unit tests still call `reply("hello")`, and both keep working unchanged. Run `poetry run pytest -q` after this edit: if all tests still pass with zero test edits, the defaults did their job.
+4. **The `if self._repository is not None` guards** — persistence is optional; without a repository, chat still works (only the LLM round-trip happens). A naive version calls `add_message` unconditionally and crashes with `AttributeError`/`None` when no repository was injected.
+
+Common edit-order mistake when adapting this file by hand: pasting the new `reply` body at the wrong indentation level gives `IndentationError: expected an indented block` — Python has no braces, indentation *is* the structure, so the body must sit one level deeper than its `def`.
+
+**Where this stands (2026-10-05):** the service accepts an optional repository and the repository, session factory, models, and first migration all exist and are applied — **but `get_chat_service` does not pass a repository yet**, so live chats are not saved to Postgres. Every piece is built; the remaining work is exactly two lines of wiring: construct `ChatRepository(session)` from the `get_session` dependency and pass it into `ChatService`, then thread a `conversation_id` through the chat request/response schemas if the API should continue conversations. That is the first task of the next work session — and a good review exercise, because it exercises every layer at once. See [[Lessons/11 Architecture Walkthrough|Lesson 11]] Part 4 Step 9.
 
 The dependency provider in `app/api/dependencies.py` opens a session per request and closes it afterwards:
 
@@ -267,7 +391,10 @@ poetry run pytest -q
 
 ## Common mistakes
 
+- **Believing Poetry's "network error" summary on this machine** — behind the corporate proxy it hides an SSL certificate failure; see the "Known quirk" section under Step 2 before debugging DNS or wifi.
 - **Forgetting `+asyncpg` in the URL** — SQLAlchemy silently uses the sync driver and you get confusing greenlet errors.
+- **`the greenlet library is required to use this function`** during `alembic revision` — the async driver is present but the greenlet bridge library isn't installed. Alembic's `env.py` is synchronous code driving an async driver; greenlet is how sync code steps into async. It is a transitive dependency of SQLAlchemy — the fix is `pip install greenlet` (stopgap) or a proper `poetry add sqlalchemy`, which pulls it automatically.
+- **`greenlet_spawn has not been called` during `alembic revision`** — a different greenlet error: the default (sync) `env.py` template is driving the async `asyncpg` URL. The fix is the async `run_migrations_online` (Step 5, item 3). Greenlet errors come in two flavors: "library is required" = greenlet isn't installed; "greenlet_spawn has not been called" = sync code reached the async driver without the async scaffolding.
 - **Committing inside the repository *and* the service** — pick one transaction boundary (see mentor question 2) or you get half-saved conversations.
 - **Applying autogenerated migrations unread** — autogenerate can propose destructive changes (drop column) for what was actually a rename.
 - **Testing against your development database** — one bad test run can wipe real data. Separate database or schema, always.
@@ -290,10 +417,14 @@ poetry run pytest -q
 
 ## Progress
 
-- Status: **Not started**
-- Completed: [ ]
+- Status: **In progress — database pieces exist, live repository wiring and integration testing remain**
+- Completed: [x] models [x] async session [x] migration [x] repository boundary [ ] inject repository into chat [ ] real database integration test
 - Date:
 
 ## References
 
 [SQLAlchemy 2.0 Session Basics](https://docs.sqlalchemy.org/en/20/orm/session_basics.html) · [Alembic documentation](https://alembic.sqlalchemy.org/en/latest/) · [FastAPI — Dependencies with yield](https://fastapi.tiangolo.com/tutorial/dependencies/dependencies-with-yield/)
+
+## Review note
+
+The lesson covers the database model, async session, migration, and repository boundaries. The live chat path still does not inject `ChatRepository`, and no real database integration test is checked in yet. Those are deliberate next steps, not reasons to move SQL into the route.

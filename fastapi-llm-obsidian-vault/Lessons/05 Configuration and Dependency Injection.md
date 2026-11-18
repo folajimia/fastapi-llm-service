@@ -16,6 +16,8 @@ Load typed settings from environment variables and use FastAPI dependencies to p
 
 Secrets must not live in source code. Dependency injection makes a route’s requirements visible and makes tests easier because dependencies can be replaced with fakes.
 
+**Safety rule:** source-code defaults must be safe to share. Use an empty string or a local demo value for an API key, never a real token. Put real values in an untracked `.env` file and keep only variable names in `.env.example`.
+
 ## Target structure
 
 ```text
@@ -57,6 +59,6 @@ Do not commit `.env`. Commit a safe `.env.example` containing names but no secre
 
 ## Progress
 
-- Status: **Mostly complete — only "Override the dependency in a test" remains, and [[Lessons/06B Wiring the Route to the Service|Lesson 06B]] Step 5 finishes it.**
-- Completed: [x] typed settings [x] `.env` gitignored [x] `.env.example` [x] settings + service injected into routes [ ] dependency override in a test
+- Status: **Complete**
+- Completed: [x] typed settings [x] `.env` gitignored [x] `.env.example` [x] settings + service injected into routes [x] dependency override in an API test
 - Date:

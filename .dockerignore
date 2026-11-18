@@ -1,6 +1,6 @@
-.git
 .venv
+.git
 __pycache__
 .pytest_cache
-.ruff_cache
-tests
+.env
+fastapi-llm-obsidian-vault

@@ -98,3 +98,6 @@ This is dependency injection in plain Python. The service does not create its ow
 - Date:
 - Commit:
 
+## Review note
+
+The prompt now uses a real newline (`\n`), and the unit test checks that same value. The earlier double-escape warning is retained above as a teaching example of how the bug looked.

@@ -13,12 +13,22 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Lessons/06B Wiring the Route to the Service.md",
+                "file": "Lessons/02 FastAPI Application.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "06B Wiring the Route to the Service"
+              "title": "02 FastAPI Application"
+            }
+          },
+          {
+            "id": "2f209f9b3d879bfb",
+            "type": "leaf",
+            "state": {
+              "type": "empty",
+              "state": {},
+              "icon": "lucide-file",
+              "title": "New tab"
             }
           }
         ]
@@ -190,18 +200,23 @@
   },
   "active": "9ee01c2513de6ba4",
   "lastOpenFiles": [
-    "Lessons/06A ChatService Without FastAPI.md",
-    "Lessons/06 Service Boundaries and LLM Client.md",
-    "Lessons/06B Wiring the Route to the Service.md",
-    "Lessons/08 Reliable LLM Workflows.md",
+    "Lessons/10 Docker CI and Final Review.md",
+    "Lessons/12 Memory and Personalization.md",
+    "Lessons/11 Architecture Walkthrough.md",
     "Lessons/07 Persistence and Migrations.md",
+    "Lessons/09 Observability and Lifespan.md",
+    "Lessons/08 Reliable LLM Workflows.md",
+    "Lessons/02 FastAPI Application.md",
+    "Lessons/01 Project Setup with Poetry.md",
+    "Lessons/playwright-mcp-plan.md",
     "Lessons/06D Testing the ChatService.md",
     "Lessons/06C Provider Isolation.md",
-    "Untitled",
+    "Lessons/06B Wiring the Route to the Service.md",
+    "Lessons/06A ChatService Without FastAPI.md",
+    "Lessons/06 Service Boundaries and LLM Client.md",
     "Lessons/05 Configuration and Dependency Injection.md",
     "Lessons/04 Testing the Health Endpoint.md",
     "Lessons/03 Routing and API Versioning.md",
-    "Lessons/02 FastAPI Application.md",
-    "Lessons/01 Project Setup with Poetry.md"
+    "Untitled"
   ]
 }

@@ -1,0 +1,32 @@
+services:
+  api:
+    build: .
+    environment:
+      # `db` is the Compose service name, so it resolves to the database
+      # container from inside the API container.
+      DATABASE_URL: postgresql+asyncpg://llm:dev@db:5432/llm
+      LLM_PROVIDER: ${LLM_PROVIDER:-demo}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_MODEL: ${LLM_MODEL:?Set LLM_MODEL in .env}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: llm
+      POSTGRES_PASSWORD: dev # local learning password; use a secret in production
+      POSTGRES_DB: llm
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U llm"]
+      interval: 5s
+      retries: 5
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

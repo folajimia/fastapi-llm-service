@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends
 
 from app.api.dependencies import get_chat_service
@@ -8,8 +10,11 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 
 
 @router.post("", response_model=ChatResponse)
-async def chat(request: ChatRequest,
-service: ChatService = Depends(get_chat_service),
+async def chat(
+    request: ChatRequest,
+    service: Annotated[ChatService, Depends(get_chat_service)],
 ) -> ChatResponse:
-    reply= await service.reply(request.message)
-    return ChatResponse(reply=reply)
+    reply, conversation_id = await service.reply(
+        request.message, request.conversation_id
+    )
+    return ChatResponse(reply=reply, conversation_id=conversation_id)

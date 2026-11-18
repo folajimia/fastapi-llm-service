@@ -67,8 +67,7 @@ Would this boundary still be useful if the service supported only one provider? 
 
 ## Progress
 
-- Status: **Not started**
-- Completed: [ ]
+- Status: **Complete conceptually; adapter tests remain**
+- Completed: [x] routes contain no provider SDK imports [x] API keys stay out of routes [x] service depends on `LLMClient` [x] provider adapters are isolated
 - Date:
 - Commit:
-

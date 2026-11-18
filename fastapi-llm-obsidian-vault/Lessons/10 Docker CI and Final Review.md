@@ -11,31 +11,55 @@ Make the service reproducible for another developer (and a server) and prevent b
 - **Docker** packages the app plus its exact Python environment into an image that behaves identically everywhere.
 - **CI** (GitHub Actions) re-runs your checks on every push and pull request, so a broken change is caught before merge — including changes you forgot to test locally.
 
-## Step 1 — The Dockerfile
+## Step 1 — Understand the two-container setup
 
-Two rules for a good Python image: install dependencies in a layer that rarely changes (copy only the lockfiles first), and do not run as root.
+There are two containers, each with one job:
+
+```text
+Your Mac                         Podman Compose network
+curl localhost:8000  ────────►  api (FastAPI, built from Dockerfile)
+                                      │
+                                      └────► db (PostgreSQL image)
+```
+
+The **Dockerfile builds the API image**. PostgreSQL comes from the official `postgres:16` image, so this project does not need a database Dockerfile. `docker-compose.yml` (run with Docker Compose or `podman compose`) starts both containers and connects them.
+
+## Step 2 — Declare and lock the Python dependencies
+
+The API imports FastAPI, Pydantic settings, SQLAlchemy, `asyncpg`, HTTPX, and the Anthropic adapter. Alembic is needed to run migrations. These packages must be listed under the main dependencies in `pyproject.toml`; packages listed only under `dev` are not installed by the Dockerfile's `--only main` command.
+
+After changing dependencies, regenerate the lock file using the same Poetry version as the Dockerfile. This project's Dockerfile pins Poetry 2.4.3:
+
+```bash
+poetry --version
+poetry lock
+```
+
+The lock file records exact package versions. `pyproject.toml` and `poetry.lock` must agree before Docker can install them.
+
+## Step 3 — Build the API image
+
+The important parts of this project's `Dockerfile` are:
 
 ```dockerfile
-# Dockerfile
 FROM python:3.12-slim
 
-ENV POETRY_VERSION=2.0.0 \
+ENV POETRY_VERSION=2.4.3 \
     POETRY_NO_INTERACTION=1 \
     POETRY_VIRTUALENVS_IN_PROJECT=1
 
-# Install Poetry; --only main skips dev tools (pytest, ruff) — smaller image
 RUN pip install "poetry==${POETRY_VERSION}"
-
 WORKDIR /app
 
-# Copy only dependency files first: this layer is cached until they change
+# Install dependencies first so code-only changes can reuse this layer.
 COPY pyproject.toml poetry.lock ./
 RUN poetry install --only main --no-root
 
-# Now the code — changes here do not reinstall dependencies
+# The API and Alembic migration files are needed in the image.
 COPY app ./app
+COPY alembic.ini ./alembic.ini
+COPY migrations ./migrations
 
-# Run as a non-root user
 RUN useradd --create-home appuser && chown -R appuser /app
 USER appuser
 
@@ -43,41 +67,22 @@ EXPOSE 8000
 CMD ["poetry", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
-Why the two-step copy: Docker builds in layers. If `pyproject.toml`/`poetry.lock` are unchanged but `app/` changed, the expensive dependency-install layer is reused and the build takes seconds instead of minutes.
+The `.dockerignore` keeps `.env`, `.venv`, Git data, and the lesson vault out of the image. Excluding `.env` is important because it may contain secrets.
 
-Also add a `.dockerignore`:
+## Step 4 — Compose starts the API and PostgreSQL
 
-```text
-.venv
-.git
-__pycache__
-.pytest_cache
-.env
-fastapi-llm-obsidian-vault
-```
-
-The `.env` line matters: without it, your secrets get baked into the image.
-
-Verify it builds and runs:
-
-```bash
-docker build -t llm-service .
-docker run --rm -p 8000:8000 llm-service
-curl localhost:8000/api/v1/health
-```
-
-## Step 2 — Docker Compose: app + PostgreSQL together
+The root `docker-compose.yml` defines these services:
 
 ```yaml
-# docker-compose.yml
 services:
   api:
     build: .
-    ports:
-      - "8000:8000"
     environment:
       DATABASE_URL: postgresql+asyncpg://llm:dev@db:5432/llm
-      LLM_API_KEY: ${LLM_API_KEY}     # read from your local .env, not committed
+      LLM_PROVIDER: ${LLM_PROVIDER:-demo}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+    ports:
+      - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
@@ -88,8 +93,6 @@ services:
       POSTGRES_USER: llm
       POSTGRES_PASSWORD: dev
       POSTGRES_DB: llm
-    ports:
-      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U llm"]
       interval: 5s
@@ -101,29 +104,90 @@ volumes:
   pgdata:
 ```
 
-Note the hostname in `DATABASE_URL` is `db`, not `localhost` — inside the Compose network, containers reach each other by service name. `condition: service_healthy` makes the API wait until Postgres actually accepts connections, not merely until its container started.
+`api.build: .` builds the API from the Dockerfile. `db.image: postgres:16` uses the standard PostgreSQL image; no custom database Dockerfile is required. Compose puts both services on a private network. The API uses hostname `db` because that is the database service name. Inside a container, `localhost` means that same container, not your Mac or another container.
+
+The database health check makes Compose wait until PostgreSQL accepts connections before starting the API. The named `pgdata` volume keeps database files when containers stop or are replaced. `down -v` deletes that data, so use it only when you intend to reset the local database. The `dev` database password is for learning locally; use managed secrets for a deployed service.
+
+## Step 5 — Start, migrate, and test the service
+
+Run from the repository root. On a Mac using Podman, install the Compose provider once if needed:
 
 ```bash
-docker compose up --build      # whole stack: API + database
-docker compose exec api poetry run alembic upgrade head   # apply migrations
+brew install podman-compose
 ```
 
-## Step 3 — The clean-checkout test
-
-The definition of done for this step: from a fresh clone,
+Build the API image and start both containers:
 
 ```bash
-git clone <repo-url> fresh-copy && cd fresh-copy
+poetry lock
+podman compose up --build -d
+podman compose ps
+podman compose logs api
+```
+
+Both services should be running. The API should show a host port mapping for `8000`. Apply the database schema from inside the API container:
+
+```bash
+podman compose exec api poetry run alembic upgrade head
+```
+
+Open `http://localhost:8000/docs`, or check the health endpoint:
+
+```bash
+curl http://localhost:8000/api/v1/health
+```
+
+`curl` runs on your Mac; the response comes from the API container through the `8000:8000` port mapping. To confirm, check `podman compose ps` for the running API and follow its request logs with `podman compose logs -f api` while sending the curl request.
+
+Stop the containers and keep database data with:
+
+```bash
+podman compose down
+```
+
+Start them again with `podman compose up -d`. To delete database data too, use `podman compose down -v` deliberately.
+
+## Step 6 — Problems we encountered and how to fix them
+
+| Error or symptom | Why it happens | Fix |
+|---|---|---|
+| `pyproject.toml changed significantly since poetry.lock was last generated` | Dependencies changed without refreshing the lock, or the lock was generated using a different Poetry version. | Use Poetry 2.4.3 to match the Dockerfile and run `poetry lock`, then rebuild. |
+| `no context directory and no Containerfile specified` | The build command omitted its context directory. | Add `.`: `podman build -t llm-service .`. |
+| `looking up compose provider failed` | `podman compose` is a wrapper and no Compose provider is installed. | On macOS run `brew install podman-compose`. |
+| `podman compose ps -a` prints usage | The installed `podman-compose` version does not accept `-a` after `ps`. | Use `podman compose ps`; to include stopped containers, use `podman ps -a`. |
+| `can only create exec sessions on running containers` | The API container exited. `exec` only works in a running container. | Check `podman compose ps` and `podman compose logs api`; fix the startup error, rebuild, and restart. |
+| `ModuleNotFoundError: No module named 'sqlalchemy'` (or another package) | The package is missing from main dependencies, or the image predates the dependency update. | Add it to `pyproject.toml`, run `poetry lock`, and rebuild the API. |
+| Alembic cannot find `alembic.ini` or `migrations` | Those files were not copied into the API image. | Keep both `COPY` lines in the Dockerfile and rebuild after migration-file changes. |
+| Alembic reports missing revision `e6e41524117d` | A migration's `down_revision` points to a revision that has no file. Here, the empty migration `33c19af18da8` should follow the existing schema migration `9cb4d0faf08e`. | Set `down_revision` in the newer file to `9cb4d0faf08e`; check that every parent revision exists. |
+| The same migration error remains after editing the file | The running container still has the old image. Host edits do not update an existing image. | Run `podman compose build --no-cache api`, then `podman compose up -d --force-recreate`. Verify the file inside the container before retrying Alembic. |
+| API cannot connect to the database using `localhost` | `localhost` inside the API container points back to the API container. | Use `db` as the database hostname in `DATABASE_URL`. |
+| Chat returns a database table error | Migrations have not been applied yet. | Run `podman compose exec api poetry run alembic upgrade head`. |
+
+Useful diagnostics:
+
+```bash
+podman compose ps
+podman compose logs api
+podman ps -a
+podman compose exec api poetry run alembic current
+```
+
+## Step 7 — Clean-checkout walkthrough
+
+From a fresh clone, the main workflow should be understandable from the README and these commands:
+
+```bash
 poetry install
-cp .env.example .env          # fill in the local values
-poetry run pytest -q
-docker compose up --build
-curl -X POST localhost:8000/api/v1/chat -H 'Content-Type: application/json' -d '{"message":"hi"}'
+poetry lock
+podman compose up --build -d
+podman compose exec api poetry run alembic upgrade head
+curl http://localhost:8000/api/v1/health
+podman compose down
 ```
 
-…all of it works, using only the README. If any step needs undocumented tribal knowledge, write that knowledge into the README now, while you still remember it.
+If a step requires undocumented knowledge, add it to the README so the next developer can follow the same path.
 
-## Step 4 — GitHub Actions CI
+## Step 8 — GitHub Actions CI
 
 ```yaml
 # .github/workflows/ci.yml
@@ -166,7 +230,7 @@ The pipeline is literally the commands you already run locally — that is the p
 
 A Docker-build step (`docker build .`) can be added once the basics are green.
 
-## Step 5 — README as the front door
+## Step 9 — README as the front door
 
 The README should answer, in order: What is this? How do I run it? How do I test it? Where do secrets go?
 
@@ -201,7 +265,9 @@ Walk the list honestly — this is the course's Definition of Done:
 
 - **`COPY . .` in the Dockerfile** — copies `.env` and `.venv` into the image; slow and leaky. Use `.dockerignore` and copy only what runs.
 - **Running as root in the container** — a compromised process gets root permissions for free.
-- **`docker compose up` without `service_healthy`** — the API starts before Postgres accepts connections and crashes on boot.
+- **Using `localhost` for the database host in Compose** — inside the API container, use the Compose service name (`db`).
+- **Expecting `compose down` to erase data** — named volumes persist; use `down -v` only when you intend to delete the local database.
+- **Running migrations in the wrong environment** — `podman compose exec api ...` runs them in the API container against the Compose database.
 - **CI without the same commands you run locally** — the moment they drift, CI failures become unexplainable.
 - **Documenting setup "later"** — later you will have forgotten the one flag that mattered.
 
